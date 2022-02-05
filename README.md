@@ -13,8 +13,9 @@ configureBindings {
     bind<FileLoader> { ProductionFileLoader() }
     // add other bindings
 }
-You should configure bindings exactly once, and as early as possible.
 ```
+You should configure bindings exactly once, and as early as possible.
+
 ### Injecting
 To inject a default constructor parameter/property:
 ```kotlin
