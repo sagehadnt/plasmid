@@ -2,6 +2,7 @@ package com.sagehadnt.plasmid
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import kotlin.reflect.KProperty
 
 /**
  * Obtain a new instance of T using Plasmid's Injector. Before calling this function, make sure you specify
@@ -13,6 +14,11 @@ import org.slf4j.LoggerFactory
 inline fun <reified T> inject(): T {
     return Injector.inject(T::class.java)
 }
+
+private const val NO_INJECTOR_ERROR =
+    "Bindings have not been configured! Call configureBindings() to set up your bindings before calling inject()"
+private const val INJECTOR_ALREADY_SET_ERROR =
+    "Injector instance has already been set. If you're seeing this error in tests, you need to clear your bindings after each test. Consult the README for how to do this."
 
 /**
  * Handles Plasmid's injections. If you're using Plasmid as a library, you shouldn't need to call any functions in
@@ -26,19 +32,13 @@ class Injector(
 
     companion object {
 
-        private var instance_: Injector? = null
-
-        val instance: Injector
-            get() = instance_
-                ?: error("Bindings have not been configured! Call configureBindings() to set up your bindings before calling inject()")
-
-        fun setInstance(instance: Injector) {
-            if (this.instance_ == null) {
-                this.instance_ = instance
-            } else {
-                error("Injector instance has already been set")
-            }
-        }
+        /**
+         * We want to lock down Injector in production so it can't be accidentally changed later, but need to reserve
+         * the right to explicitly reset it so we can clear bindings between tests. We grab the delegate here so
+         * we can reset it in clearBindings().
+         */
+        private val instanceDelegate = LateinitVal<Injector>(INJECTOR_ALREADY_SET_ERROR, NO_INJECTOR_ERROR)
+        var instance: Injector by instanceDelegate
 
         inline fun <reified T> inject(clazz: Class<T>): T {
             val newObj = getValue(clazz) ?: getDefault(clazz)
@@ -60,8 +60,8 @@ class Injector(
         }
 
         fun clearBindings() {
-            if (instance_ != null) {
-                instance_ = null
+            if (instanceDelegate.isLocked) {
+                instanceDelegate.reset()
                 LOGGER.info("Cleared all bindings")
             } else {
                 LOGGER.warn("No bindings have been configured")
@@ -72,3 +72,35 @@ class Injector(
     }
 }
 
+/**
+ * Like `lateinit var`, but once set it will throw an error on subsequent attempts to change it, protecting
+ * against accidental changes when we really want `val`-like behaviour. If necessary, the value can be unlocked again
+ * by explicitly calling reset().
+ */
+class LateinitVal<T>(
+    private val alreadySetError: String,
+    private val notSetError: String
+) {
+
+    private var value: T? = null
+
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): T = value ?: error(notSetError)
+
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+        if (!isLocked) {
+            this.value = value
+        } else {
+            error(alreadySetError)
+        }
+    }
+
+    val isLocked: Boolean
+        get() = value != null
+
+    /**
+     * Remove the current value and allow it to be set again.
+     */
+    fun reset() {
+        value = null
+    }
+}

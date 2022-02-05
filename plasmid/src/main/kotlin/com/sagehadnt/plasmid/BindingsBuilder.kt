@@ -59,7 +59,7 @@ class BindingsBuilder {
 
     fun done() {
         LOGGER.info("Finished configuring bindings")
-        Injector.setInstance(Injector(bindings, defaultSupplier))
+        Injector.instance = Injector(bindings, defaultSupplier)
     }
 
     companion object {
