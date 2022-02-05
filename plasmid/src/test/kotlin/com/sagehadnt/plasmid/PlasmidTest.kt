@@ -1,13 +1,68 @@
 package com.sagehadnt.plasmid
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito
+import org.junit.jupiter.api.assertThrows
+import org.mockito.Mockito.`when`
+import org.mockito.Mockito.mock
 
 class PlasmidTest {
 
+    @AfterEach
+    fun tearDown() {
+        clearBindings()
+    }
+
     @Test
-    fun `test production bindings`() {
+    fun `bind suppliers`() {
+        configureBindings { bind { FileSystem() } }
+        assertThat(inject<FileSystem>()).isExactlyInstanceOf(FileSystem::class.java)
+    }
+
+    @Test
+    fun `bind singletons`() {
+        val fileSystem = FileSystem()
+        configureBindings { bindSingleton(fileSystem) }
+        assertThat(inject<FileSystem>()).isEqualTo(fileSystem)
+    }
+
+    @Test
+    fun `bind defaults`() {
+        configureBindings { withDefault { FileSystem() } }
+        assertThat(inject<FileSystem>()).isExactlyInstanceOf(FileSystem::class.java)
+    }
+
+    @Test
+    fun `clear bindings`() {
+        configureBindings { bindSingleton(FileSystem()) }
+        clearBindings()
+        assertThrows<Exception> { inject<FileSystem>() }
+    }
+
+    @Test
+    fun `clear bindings and then rebind`() {
+        configureBindings { bindSingleton(FileSystem()) }
+        clearBindings()
+        val reboundFilesystem = FileSystem()
+        configureBindings { bindSingleton(reboundFilesystem) }
+        assertThat(inject<FileSystem>()).isEqualTo(reboundFilesystem)
+    }
+
+    @Test
+    fun `should error when no bindings configured`() {
+        assertThrows<Exception> { inject<FileLoader>() }
+    }
+
+    @Test
+    fun `should error when no binding specified but other bindings exist`() {
+        val fileSystem = FileSystem()
+        configureBindings { bindSingleton(fileSystem) }
+        assertThrows<Exception> { inject<FileLoader>() }
+    }
+
+    @Test
+    fun `should be able to inject into nested objects`() {
         configureBindings {
             bind<FileLoader> { ProductionFileLoader() }
             bindSingleton(FileSystem())
@@ -20,7 +75,7 @@ class PlasmidTest {
     }
 
     @Test
-    fun `test test-specific bindings`() {
+    fun `inject fake implementations`() {
         configureBindings {
             bind<FileLoader> { TestFileLoader("test-file.txt") }
         }
@@ -32,15 +87,17 @@ class PlasmidTest {
     }
 
     @Test
-    fun `test using mocks as default bindings`() {
+    fun `inject mocks`() {
         configureBindings {
-            withDefault { Mockito.mock(it) }
+            bind<FileLoader> {
+                mock(FileLoader::class.java).apply {
+                    `when`(load("test-file.txt"))
+                        .thenReturn(File("test-file.txt"))
+                }
+            }
         }
 
         val fileLoader = inject<FileLoader>()
-        Mockito.`when`(fileLoader.load("test-file.txt"))
-            .thenReturn(File("test-file.txt"))
-
         val file = fileLoader.load("test-file.txt")
         assertThat(file.name).isEqualTo("test-file.txt")
     }
@@ -50,7 +107,7 @@ class PlasmidTest {
         configureBindings {
             bind<FileLoader> { ProductionFileLoader() }
             bindSingleton(FileSystem())
-            withDefault { Mockito.mock(it) }
+            withDefault { mock(it) }
         }
         val fileLoader = inject<FileLoader>()
         assertThat(fileLoader).isInstanceOf(ProductionFileLoader::class.java)
@@ -60,7 +117,7 @@ class PlasmidTest {
     }
 
     @Test
-    fun `test nested constructor injection`() {
+    fun `inject into nested constructors`() {
         configureBindings {
             bind { FileManager(inject()) }
             bindSingleton(FileSystem())
@@ -74,7 +131,6 @@ class PlasmidTest {
         val file = fileLoader.load("pom.xml")
         assertThat(file.name).isEqualTo("pom.xml")
     }
-
 }
 
 data class File(val name: String)
@@ -83,7 +139,7 @@ interface FileLoader {
     fun load(filename: String): File
 }
 
-class ProductionFileLoader: FileLoader {
+class ProductionFileLoader : FileLoader {
 
     private val fileSystem = inject<FileSystem>()
 
@@ -101,10 +157,9 @@ class FileSystem {
     fun load(filename: String): File {
         return files[filename] ?: error("No such file '$filename'")
     }
-
 }
 
-class TestFileLoader(vararg files: String): FileLoader {
+class TestFileLoader(vararg files: String) : FileLoader {
 
     private val files: Map<String, File> = files.associateWith { File(it) }
 
