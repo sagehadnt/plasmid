@@ -1,5 +1,5 @@
 # Plasmid
-Plasmid is a simple dependency injection framework written in Kotlin. It's designed for low-fuss and easy-to-understand injection.
+Plasmid is a simple dependency injection framework written in Kotlin. It's designed for low-fuss, easy-to-understand injection.
 All injections are performed at runtime, incurring a very small (but nonzero) overhead.
 
 ## Quickstart
@@ -13,6 +13,7 @@ configureBindings {
     bind<FileLoader> { ProductionFileLoader() }
     // add other bindings
 }
+You should configure bindings exactly once, and as early as possible.
 ```
 ### Injecting
 To inject a default constructor parameter/property:
@@ -98,3 +99,5 @@ fun main() {
     val b: B = inject<A>() // returns a new instance of C as configured in the binding
 }
 ```
+
+Finally, remember that using Plasmid can end up shifting a class of *compile-time errors* into *runtime errors*. Plasmid can't tell you ahead of time whether you've forgotten to supply a binding. Usually this shouldn't be a problem, because the lack of binding will be immediately apparent on startup; but there may be cases where a missing binding causes an error a long time after startup. A long-term goal for Plasmid is to add tooling to detect missing bindings at compile time.
