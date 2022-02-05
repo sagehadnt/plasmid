@@ -1,18 +1,14 @@
 package com.sagehadnt.plasmid
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mockito.`when`
 import org.mockito.Mockito.mock
 
+@ExtendWith(PlasmidTestExtension::class)
 class PlasmidTest {
-
-    @AfterEach
-    fun tearDown() {
-        clearBindings()
-    }
 
     @Test
     fun `bind suppliers`() {
@@ -70,20 +66,20 @@ class PlasmidTest {
         val fileLoader = inject<FileLoader>()
         assertThat(fileLoader).isInstanceOf(ProductionFileLoader::class.java)
 
-        val file = fileLoader.load("pom.xml")
-        assertThat(file.name).isEqualTo("pom.xml")
+        val file = fileLoader.load(FILENAME)
+        assertThat(file.name).isEqualTo(FILENAME)
     }
 
     @Test
     fun `inject fake implementations`() {
         configureBindings {
-            bind<FileLoader> { TestFileLoader("test-file.txt") }
+            bind<FileLoader> { TestFileLoader(FILENAME) }
         }
         val fileLoader = inject<FileLoader>()
         assertThat(fileLoader).isInstanceOf(TestFileLoader::class.java)
 
-        val file = fileLoader.load("test-file.txt")
-        assertThat(file.name).isEqualTo("test-file.txt")
+        val file = fileLoader.load(FILENAME)
+        assertThat(file.name).isEqualTo(FILENAME)
     }
 
     @Test
@@ -91,15 +87,15 @@ class PlasmidTest {
         configureBindings {
             bind<FileLoader> {
                 mock(FileLoader::class.java).apply {
-                    `when`(load("test-file.txt"))
-                        .thenReturn(File("test-file.txt"))
+                    `when`(load(FILENAME))
+                        .thenReturn(File(FILENAME))
                 }
             }
         }
 
         val fileLoader = inject<FileLoader>()
-        val file = fileLoader.load("test-file.txt")
-        assertThat(file.name).isEqualTo("test-file.txt")
+        val file = fileLoader.load(FILENAME)
+        assertThat(file.name).isEqualTo(FILENAME)
     }
 
     @Test
@@ -112,8 +108,8 @@ class PlasmidTest {
         val fileLoader = inject<FileLoader>()
         assertThat(fileLoader).isInstanceOf(ProductionFileLoader::class.java)
 
-        val file = fileLoader.load("pom.xml")
-        assertThat(file.name).isEqualTo("pom.xml")
+        val file = fileLoader.load(FILENAME)
+        assertThat(file.name).isEqualTo(FILENAME)
     }
 
     @Test
@@ -128,42 +124,9 @@ class PlasmidTest {
         val fileLoader = fileManager.fileLoader
         assertThat(fileLoader).isInstanceOf(ProductionFileLoader::class.java)
 
-        val file = fileLoader.load("pom.xml")
-        assertThat(file.name).isEqualTo("pom.xml")
+        val file = fileLoader.load(FILENAME)
+        assertThat(file.name).isEqualTo(FILENAME)
     }
 }
 
-data class File(val name: String)
-
-interface FileLoader {
-    fun load(filename: String): File
-}
-
-class ProductionFileLoader : FileLoader {
-
-    private val fileSystem = inject<FileSystem>()
-
-    override fun load(filename: String) = fileSystem.load(filename)
-}
-
-class FileSystem {
-
-    private val files: Map<String, File> = listOf(
-        "pom.xml",
-        "config",
-        "notes.md"
-    ).associateWith { File(it) }
-
-    fun load(filename: String): File {
-        return files[filename] ?: error("No such file '$filename'")
-    }
-}
-
-class TestFileLoader(vararg files: String) : FileLoader {
-
-    private val files: Map<String, File> = files.associateWith { File(it) }
-
-    override fun load(filename: String) = files[filename] ?: error("No such file '$filename'")
-}
-
-class FileManager(val fileLoader: FileLoader)
+private const val FILENAME = "pom.xml"
