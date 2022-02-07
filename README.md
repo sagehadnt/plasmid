@@ -10,8 +10,17 @@ Using Plasmid consists of two steps:
 ### Binding
 ```kotlin
 configureBindings {
+    // Bind a supplier to be invoked on requests to inject this type
     bind<FileLoader> { ProductionFileLoader() }
+    
+    // Bind a single instance to all requests for this type
+    bindSingleton<SocketController>(BasicSocketController())
+    
+    // Optionally create a default binding as a fallback for unbound types
+    withDefault(mock())
+    
     // add other bindings
+    // ...
 }
 ```
 You should configure bindings exactly once, and as early as possible.
@@ -97,7 +106,6 @@ fun main() {
     }
     val a = inject<A>() // returns a new instance of C as configured in the binding
     val b = inject<B>() // throws an error because even though there's an implicit binding via A, there's no exact binding via B
-    val b: B = inject<A>() // returns a new instance of C as configured in the binding
 }
 ```
 
