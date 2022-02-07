@@ -17,8 +17,8 @@ configureBindings {
     bindSingleton<SocketController>(BasicSocketController())
     
     // Optionally create a default binding as a fallback for unbound types
-    withDefault(mock())
-    
+    withDefault { mock(it) }
+            
     // add other bindings
     // ...
 }
